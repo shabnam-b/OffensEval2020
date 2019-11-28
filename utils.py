@@ -53,12 +53,28 @@ def bert_transformer(input_ids, input_mask, bert_config, config):
     return bert_encoder_layer
 
 
-def load_data(config):
+def load_train_data(config):
     df = pd.read_csv(config['data_dir'] + os.sep + "olid-training-v1.0.tsv", sep="\t", header=0)
     sents = df['tweet']
     label_a = df['subtask_a']
     label_b = df['subtask_b']
     return sents, label_a.tolist(), label_b.tolist()
+
+
+def load_test_data(path_to_data, path_to_labels):
+    tweet_id = {}
+    tweets = []
+    with open(path_to_data) as input:
+        next(input)
+        for line in input:
+            sp = line.split('\t')
+            tweet_id[sp[0]] = sp[1].strip('\n')
+    df = pd.read_csv(path_to_labels, header=None, names=['id', 'label'])
+    lbs = df['label'].tolist()
+    ids = df['id'].tolist()
+    for i in ids:
+        tweets.append(tweet_id[str(i)])
+    return tweets, lbs
 
 
 def clean_tweets(tweets):
@@ -96,7 +112,7 @@ config = {'bert_config': 'cased_L-12_H-768_A-12/bert_config.json',
           'vocab_file': 'cased_L-12_H-768_A-12/bert_config.json',
           'do_train': True
           }
-sents,label_a,label_b = load_data(config)
+sents, label_a, label_b = load_train_data(config)
 
 sents = clean_tweets(sents)
 input_ids, input_mask, input_tokens = tokenize(sents, max_seq_len=64)
