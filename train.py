@@ -2,7 +2,6 @@ import tensorflow as tf
 
 from model.multi_classifier import MultiClassifier
 from utils.args_helper import parse_training_parameters
-
 from utils.utils import batch_iter
 
 
@@ -18,25 +17,28 @@ def train(train_x, train_y1, train_y2, test_x, test_y1, test_y2, FLAGS):
         clipped_grads, _ = tf.clip_by_global_norm(grads, FLAGS.clip_norm)
         optimizer = tf.train.AdamOptimizer(FLAGS.learning_rate)
         training_opt = optimizer.apply_gradients(zip(clipped_grads, parameters), global_step=global_step)
-        
+
         # t1_loss = tf.summary.scalar("Loss 1", multi_classifier.loss_t1)
         # t2_loss = tf.summary.scalar("Loss 2", multi_classifier.loss_t2)
-        # total_loss = tf.summary.scalar("Total Loss", multi_classifier.Loss)
+        # Loss = tf.summary.scalar("Total Loss", multi_classifier.Loss)
         op = tf.summary.merge_all()
         writer = tf.summary.FileWriter("summary", sess.graph)
 
         sess.run(tf.global_variables_initializer())
 
         def train_step(batch_in, batch_y1, batch_y2):
-            feed_dict = {multi_classifier.inp: batch_in, multi_classifier.y_t1: batch_y1, multi_classifier.y_t2: batch_y2,
+
+            feed_dict = {multi_classifier.inp: batch_in, multi_classifier.y_t1: batch_y1,
+                         multi_classifier.y_t2: batch_y2,
                          multi_classifier.dropout: FLAGS.keep_prob}
-            _, step, summaries, Loss, lm_loss, clf_loss = \
-                sess.run([training_opt, global_step, op, multi_classifier.Loss, multi_classifier.loss_t1, multi_classifier.loss_t2],
+            _, step, summaries, Loss, loss_y1, loss_y2 = \
+                sess.run([training_opt, global_step, op, multi_classifier.Loss, multi_classifier.loss_t1,
+                          multi_classifier.loss_t2],
                          feed_dict=feed_dict)
             writer.add_summary(summaries, step)
 
             if step % 100 == 0:
-                print("Step {0}: Total Loss={1} ( Loss(Y1)={2}, Loss(Y2) = {3} )".format(step, Loss, lm_loss, clf_loss))
+                print("Step {0}: Total Loss={1} ( Loss(Y1)={2}, Loss(Y2) = {3} )".format(step, Loss, loss_y1, loss_y2))
 
         def eval_step(test_x, test_y1, test_y2):
             pass
@@ -56,7 +58,7 @@ if __name__ == '__main__':
 
     """
  
-    TODO : loading dataset...
+        TODO : loading dataset...
     
     """
     train(FLAGS)

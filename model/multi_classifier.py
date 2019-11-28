@@ -7,7 +7,6 @@ from utils.utils import load_embeddings
 class MultiClassifier():
 
     def __init__(self, num_labels, FLAGS):
-
         # self.dropout = args.dropout
         self.y_t1 = None
         self.y_t2 = None
@@ -25,7 +24,6 @@ class MultiClassifier():
         self.emb_size = FLAGS.embedding_size
 
         self.x_len = tf.reduce_sum(tf.sign(self.inp), 1)
-
 
         # Load the embeddings
         with tf.name_scope("embedding"):
@@ -47,7 +45,6 @@ class MultiClassifier():
             self.task2_logits = tf.layers.dense(flattened, self.num_labels)
             self.pred2 = tf.argmax(self.task2_logits, axis=-1)
 
-
         with tf.name_scope("loss"):
             self.loss_t1 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(
                 logits=self.task1_logits,
@@ -57,7 +54,6 @@ class MultiClassifier():
                 labels=self.y_t2))
 
             self.Loss = self.loss_t1 + self.loss_t2
-
 
     def make_cell(self):
         lstm_cell = rnn.BasicLSTMCell(self.num_hidden)
