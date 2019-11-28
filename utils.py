@@ -4,6 +4,9 @@ import numpy as np
 import modelling
 import tokenization
 import tensorflow as tf
+import emoji
+from ekphrasis.classes.preprocessor import TextPreProcessor
+import wordsegment
 
 
 def tensorize(input_tensor, type):
@@ -38,27 +41,60 @@ def tokenize(sents, max_seq_len):
 
 def bert_transformer(input_ids, input_mask, bert_config, config):
     bert_model = modelling.BertModel(
-      config=bert_config,
-      is_training=config['do_train'],
-      input_ids=input_ids,
-      input_mask=input_mask,
-      use_one_hot_embeddings=False,
-      scope='bert')
+        config=bert_config,
+        is_training=config['do_train'],
+        input_ids=input_ids,
+        input_mask=input_mask,
+        use_one_hot_embeddings=False,
+        scope='bert')
     bert_encoder_layer = bert_model.get_sequence_output()
 
     return bert_encoder_layer
 
 
-config={'bert_config':'cased_L-12_H-768_A-12/bert_config.json',
-        'data_dir': './dataset',
-        'vocab_file': 'cased_L-12_H-768_A-12/bert_config.json',
-        'do_train': True
-        }
-data_dir = "./dataset"
+def load_data(config):
+    df = pd.read_csv(config['data_dir'] + os.sep + "olid-training-v1.0.tsv", sep="\t", header=0)
+    sents = df['tweet']
+    label_a = df['subtask_a']
+    label_b = df['subtask_b']
+    return sents, label_a, label_b
 
-df = pd.read_csv(config['data_dir']+os.sep+"olid-training-v1.0.tsv", sep="\t", header=0)
-sents = df['tweet']
 
+def clean_tweets(tweets):
+    text_processor = TextPreProcessor(
+        # terms that will be normalized
+        normalize=['email', 'phone',
+                   'time', 'date', 'number'],
+        # terms that will be annotated
+        annotate={},
+        fix_html=False,  # fix HTML tokens
+
+        # corpus from which the word statistics are going to be used
+        # for word segmentation
+        segmenter="twitter",
+
+        # corpus from which the word statistics are going to be used
+        # for spell correction
+        corrector="twitter",
+
+        unpack_hashtags=True,  # perform word segmentation on hashtags
+        unpack_contractions=False,  # Unpack contractions (can't -> can not)
+        spell_correct_elong=False,  # spell correction for elongated words
+
+    )
+    for i in range(len(tweets)):
+        tweets[i] = text_processor.pre_process_doc(tweets[i])
+        tweets[i] = emoji.demojize(tweets[i])
+    return tweets
+
+
+config = {'bert_config': 'cased_L-12_H-768_A-12/bert_config.json',
+          'data_dir': './dataset',
+          'vocab_file': 'cased_L-12_H-768_A-12/bert_config.json',
+          'do_train': True
+          }
+sents = load_data(config)
+sents = clean_tweets(sents)
 input_ids, input_mask, input_tokens = tokenize(sents, max_seq_len=64)
 
 with tf.variable_scope('bert_embedding'):
