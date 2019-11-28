@@ -1,14 +1,14 @@
-import io, os, sys
-import pandas as pd
-import numpy as np
+import os
 import re
-import modelling
-import tokenization
-import tensorflow as tf
+
 import emoji
-from ekphrasis.classes.preprocessor import TextPreProcessor
-import wordsegment
 import nltk
+import numpy as np
+import pandas as pd
+import tensorflow as tf
+from ekphrasis.classes.preprocessor import TextPreProcessor
+
+import modelling
 
 
 def load_vec(path):
@@ -35,7 +35,7 @@ def tokenize(sents, max_seq_len):
             else:
                 sent_embed.append(embeddings_index[word])
         for _ in range(len(sent_tokenized), max_seq_len):
-            sent_embed.append(([0.0]*300))
+            sent_embed.append(([0.0] * 300))
         embeddings.append(sent_embed)
     return np.asanyarray(embeddings)
 
@@ -137,15 +137,30 @@ def clean_tweets(tweets):
     return tweets
 
 
-config = {'bert_config': 'cased_L-12_H-768_A-12/bert_config.json',
-          'data_dir': './dataset',
-          'vocab_file': 'cased_L-12_H-768_A-12/bert_config.json',
-          'do_train': True
-          }
-sents, label_a, label_b = load_train_data(config)
+def load_embeddings():
+    config = {'bert_config': 'cased_L-12_H-768_A-12/bert_config.json',
+              'data_dir': './dataset',
+              'vocab_file': 'cased_L-12_H-768_A-12/bert_config.json',
+              'do_train': True
+              }
+    sents, label_a, label_b = load_train_data(config)
+    sents = clean_tweets(sents)
+    embeddings = tokenize(sents, max_seq_len=64)
 
-sents = clean_tweets(sents)
-embeddings = tokenize(sents, max_seq_len=64)
+    return embeddings
+
+
+def batch_iter(inputs, y1, y2, batch_size, num_epochs):
+    inputs = np.array(inputs)
+    y1 = np.array(y1)
+    y2 = np.array(y2)
+    num_batches_per_epoch = (len(inputs) - 1) // batch_size + 1
+
+    for epoch in range(num_epochs):
+        for batch_num in range(num_batches_per_epoch):
+            start_index = batch_num * batch_size
+            end_index = min((batch_num + 1) * batch_size, len(inputs))
+            yield inputs[start_index:end_index], y1[start_index:end_index], y2[start_index:end_index]
 
 # with tf.variable_scope('bert_embedding'):
 #     bert_config = modelling.BertConfig.from_json_file(config['vocab_file'])
