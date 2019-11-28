@@ -1,6 +1,7 @@
 import io, os, sys
 import pandas as pd
 import numpy as np
+import re
 import modelling
 import tokenization
 import tensorflow as tf
@@ -57,7 +58,7 @@ def load_data(config):
     sents = df['tweet']
     label_a = df['subtask_a']
     label_b = df['subtask_b']
-    return sents, label_a, label_b
+    return sents, label_a.tolist(), label_b.tolist()
 
 
 def clean_tweets(tweets):
@@ -82,7 +83,9 @@ def clean_tweets(tweets):
         spell_correct_elong=False,  # spell correction for elongated words
 
     )
+    tweets = [re.sub(r"(#\w+)", "#\g<1>#", t) for t in tweets.tolist()]
     for i in range(len(tweets)):
+        # tweets[i] = re.sub(r"(#\w+)", "#\1#", tweets[i])
         tweets[i] = text_processor.pre_process_doc(tweets[i])
         tweets[i] = emoji.demojize(tweets[i])
     return tweets
@@ -93,7 +96,8 @@ config = {'bert_config': 'cased_L-12_H-768_A-12/bert_config.json',
           'vocab_file': 'cased_L-12_H-768_A-12/bert_config.json',
           'do_train': True
           }
-sents = load_data(config)
+sents,label_a,label_b = load_data(config)
+
 sents = clean_tweets(sents)
 input_ids, input_mask, input_tokens = tokenize(sents, max_seq_len=64)
 
