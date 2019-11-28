@@ -1,7 +1,7 @@
 import tensorflow as tf
 from tensorflow.contrib import rnn
 
-from utils import load_embeddings
+from utils.utils import load_embeddings
 
 
 class MultiClassifier():
@@ -18,8 +18,8 @@ class MultiClassifier():
         self.num_labels = num_labels
 
         self.inp = tf.placeholder(tf.int32, [None, FLAGS.max_document_len])
-        self.lm_y = tf.placeholder(tf.int32, [None, FLAGS.max_document_len])
-        self.clf_y = tf.placeholder(tf.int32, [None])
+        self.y1 = tf.placeholder(tf.int32, [None, FLAGS.max_document_len])
+        self.y2 = tf.placeholder(tf.int32, [None])
 
         self.dropout = tf.placeholder(tf.float32, [])
         self.emb_size = FLAGS.embedding_size
