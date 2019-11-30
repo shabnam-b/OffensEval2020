@@ -11,8 +11,6 @@ import pandas as pd
 import tensorflow as tf
 
 import modelling
-
-
 # nlp = spacy.load("en_core_web_sm")
 from utils import Constant
 
@@ -175,10 +173,23 @@ def batch_iter(inputs, y1, y2, batch_size, num_epochs):
     num_batches_per_epoch = (len(inputs) - 1) // batch_size + 1
 
     for epoch in range(num_epochs):
+        print('Epoch {} started...'.format(epoch + 1))
         for batch_num in range(num_batches_per_epoch):
             start_index = batch_num * batch_size
             end_index = min((batch_num + 1) * batch_size, len(inputs))
             yield inputs[start_index:end_index], y1[start_index:end_index], y2[start_index:end_index]
+
+
+def batch_iter_eval(inputs, y, batch_size, num_epochs):
+    inputs = np.array(inputs)
+    y1 = np.array(y)
+    num_batches_per_epoch = (len(inputs) - 1) // batch_size + 1
+
+    for epoch in range(num_epochs):
+        for batch_num in range(num_batches_per_epoch):
+            start_index = batch_num * batch_size
+            end_index = min((batch_num + 1) * batch_size, len(inputs))
+            yield inputs[start_index:end_index], y1[start_index:end_index]
 
 
 def build_word_dict():
@@ -214,7 +225,7 @@ def build_word_dict():
 def load_embeddings(vocab):
     vocab_size = len(vocab)
     emb = np.random.uniform(-1, 1, (vocab_size, 300))
-    emb[Constant.PAD_ID] = 0 # <pad> should be all 0 (using broadcast)
+    emb[Constant.PAD_ID] = 0  # <pad> should be all 0 (using broadcast)
 
     w2id = {w: i for i, w in enumerate(vocab)}
     with open('/disk1/sajad/glove/glove.6B.300d.txt', encoding="utf8") as f:
@@ -224,7 +235,6 @@ def load_embeddings(vocab):
             if token in w2id:
                 emb[w2id[token]] = [float(v) for v in elems[-300:]]
     return emb
-
 
 
 def load_train_data_nn(word_dict, max_document_len):

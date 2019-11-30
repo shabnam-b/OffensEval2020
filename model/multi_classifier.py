@@ -48,11 +48,11 @@ class Model(object):
 
         with tf.name_scope("subtaska-accuracy"):
             correct_predictions = tf.equal(self.subtaska_predictions, self.Y1)
-            self.accuracy = tf.reduce_mean(tf.cast(correct_predictions, "float"))
+            self.suba_accuracy = tf.reduce_mean(tf.cast(correct_predictions, "float"))
 
-        # with tf.name_scope("subtaskb-accuracy"):
-        #     correct_predictions = tf.equal(self.subtaskb_predictions, self.Y2)
-        #     self.accuracy = tf.reduce_mean(tf.cast(correct_predictions, "float"))
+        with tf.name_scope("subtaskb-accuracy"):
+            correct_predictions = tf.equal(self.subtaskb_predictions, self.Y2)
+            self.subb_accuracy = tf.reduce_mean(tf.cast(correct_predictions, "float"))
 
     def make_cell(self):
         cell = rnn.BasicLSTMCell(self.num_hidden)

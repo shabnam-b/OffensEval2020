@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 
 from model.multi_classifier import Model
-from utils.utils import load_train_data_nn, load_test_data_nn, build_word_dict, batch_iter
+from utils.utils import load_train_data_nn, load_test_data_nn, build_word_dict, batch_iter, batch_iter_eval
 
 
 def train(train_x, train_y1, train_y2, test_x1, test_x2, test_y1, test_y2, word_dict, args):
@@ -30,47 +30,54 @@ def train(train_x, train_y1, train_y2, test_x1, test_x2, test_y1, test_y2, word_
         sess.run(tf.global_variables_initializer())
 
         def train_step(batch_x, batch_y1, batch_y2):
-            feed_dict = {model.X: batch_x, model.Y1: batch_y1, model.Y2: batch_y2, model.dropout: args.keep_prob}
+            feed_dict = {model.X: batch_x, model.Y1: batch_y1, model.Y2: batch_y2, model.dropout: args.dropout}
             _, step, summaries, Loss, y1_loss, y2_loss = \
                 sess.run([train_op, global_step, summary_op, model.Loss, model.subtaska_loss, model.subtaskb_loss],
                          feed_dict=feed_dict)
             summary_writer.add_summary(summaries, step)
 
             if step % 100 == 0:
-                print("step {0}: loss={1} (y1_loss={2}, clf_loss={3})".format(step, Loss, y1_loss, y2_loss))
+                print("step {0}: loss={1} (y1_loss={2}, y2_loss={3})".format(step, Loss, y1_loss, y2_loss))
 
-        def eval(test_x, test_y1, test_y2):
-            test_batches = batch_iter(test_x, test_y1, test_y2, args.batch_size, args.num_epochs)
+        def eval(test_x, test_y, which):
+
+            test_batches = batch_iter_eval(test_x, test_y, args.batch_size, args.num_epochs)
             losses, accuracies, iters = 0, 0, 0
 
-            for batch_x, batch_y1, batch_y2 in test_batches:
-                feed_dict = {model.X: batch_x, model.Y1: batch_y1, model.Y2: batch_y2, model.dropout: 1.0}
-                y1_loss, accuracy = sess.run([model.subtaska_loss, model.accuracy], feed_dict=feed_dict)
-                losses += y1_loss
+            for batch_x, batch_y, in test_batches:
+                if which == 'A':
+                    feed_dict = {model.X: batch_x, model.Y1: batch_y, model.Y2: batch_y, model.dropout: 0.8}
+                    y_loss, accuracy = sess.run([model.subtaska_loss, model.suba_accuracy], feed_dict=feed_dict)
+                else:
+                    feed_dict = {model.X: batch_x, model.Y1: batch_y, model.Y2: batch_y, model.dropout: 0.8}
+                    y_loss, accuracy = sess.run([model.subtaskb_loss, model.subb_accuracy], feed_dict=feed_dict)
+                losses += y_loss
                 accuracies += accuracy
                 iters += 1
 
-            print("\ntest perplexity = {0}".format(np.exp(losses / iters)))
-            print("test accuracy = {0}\n".format(accuracies / iters))
+            print("test perplexity = {0}".format(np.exp(losses / iters)))
+            print("Test Accuracy = {0}\n".format(accuracies / iters))
 
         batches = batch_iter(train_x, train_y1, train_y2, args.batch_size, args.num_epochs)
         for batch_x, batch_y1, batch_y2 in batches:
             train_step(batch_x, batch_y1, batch_y2)
-            step = tf.train.global_step(sess, global_step)
-
-        # eval(test_x, test_lm_y, test_clf_y)
+        print("-------------Training Ended--------------")
+        print("Subtask A (Glove):")
+        eval(test_x1, test_y1, 'A')
+        print("Subtask B (Glove):")
+        eval(test_x2, test_y2, 'B')
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--embedding_size", type=int, default=150, help="embedding size.")
+    parser.add_argument("--embedding_size", type=int, default=300, help="embedding size.")
     parser.add_argument("--num_layers", type=int, default=1, help="RNN network depth.")
     parser.add_argument("--num_hidden", type=int, default=150, help="RNN network size.")
 
-    parser.add_argument("--keep_prob", type=float, default=0.8, help="dropout keep prob.")
+    parser.add_argument("--dropout", type=float, default=0.8, help="dropout keep prob.")
     parser.add_argument("--learning_rate", type=float, default=1e-3, help="learning rate.")
     parser.add_argument("--batch_size", type=int, default=64, help="batch size.")
-    parser.add_argument("--num_epochs", type=int, default=10, help="number of epochs.")
+    parser.add_argument("--num_epochs", type=int, default=3, help="number of epochs.")
     parser.add_argument("--max_document_len", type=int, default=100, help="max document length.")
     args = parser.parse_args()
 
