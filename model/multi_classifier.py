@@ -9,6 +9,7 @@ class Model(object):
         self.embedding_size = args.embedding_size
         self.num_layers = args.num_layers
         self.num_hidden = args.num_hidden
+        self.num_hidden = self.num_hidden * 2
 
         self.X = tf.placeholder(tf.int32, [None, args.max_document_len])
         self.Y1 = tf.placeholder(tf.int32, [None])
@@ -18,16 +19,25 @@ class Model(object):
         self.X_len = tf.reduce_sum(tf.sign(self.X), 1)
 
         with tf.name_scope("embedding"):
+            # Embeddings whether GloVe or Bert
             # self.embeddings = load_embeddings(vocab)
+
+            # Bert Embeddings
+
+            # Glove Embeddings
             init_embeddings = load_embeddings(vocab)
+
+            # Random Embeddingss
             # init_embeddings = tf.random_uniform([vocabulary_size, self.embedding_size])
             embeddings = tf.get_variable("embeddings", initializer=init_embeddings)
             self.x_emb = tf.nn.embedding_lookup(embeddings, self.X)
 
         with tf.name_scope("rnn"):
-            cell = rnn.MultiRNNCell([self.make_cell() for _ in range(self.num_layers)])
-            rnn_outputs, _ = tf.nn.dynamic_rnn(
-                cell, self.x_emb, sequence_length=self.X_len, dtype=tf.float64)
+            fw_multi_cell = rnn.MultiRNNCell([self.make_cell() for _ in range(self.num_layers)])
+            bw_multi_cell = rnn.MultiRNNCell([self.make_cell() for _ in range(self.num_layers)])
+            rnn_outputs, _ = tf.nn.bidirectional_dynamic_rnn(
+                fw_multi_cell, bw_multi_cell, self.x_emb, sequence_length=self.X_len, dtype=tf.float64)
+            rnn_outputs = tf.concat(rnn_outputs, 2)
 
         with tf.name_scope("subtaska-output"):
             rnn_outputs_flat = tf.reshape(rnn_outputs, [-1, args.max_document_len * self.num_hidden])
@@ -55,6 +65,6 @@ class Model(object):
             self.subb_accuracy = tf.reduce_mean(tf.cast(correct_predictions, "float"))
 
     def make_cell(self):
-        cell = rnn.BasicLSTMCell(self.num_hidden)
+        cell = rnn.BasicLSTMCell(self.num_hidden / 2)
         cell = rnn.DropoutWrapper(cell, output_keep_prob=self.dropout)
         return cell

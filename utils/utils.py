@@ -12,7 +12,6 @@ import tensorflow as tf
 
 import modelling
 # nlp = spacy.load("en_core_web_sm")
-from utils import Constant
 
 
 def load_vec(path):
@@ -200,7 +199,7 @@ def build_word_dict():
         words = list()
         for tweet in tweets:
             for word in tokenize_text(tweet):
-                words.append(word)
+                words.append(word.lower())
 
         word_counter = collections.Counter(words).most_common()
         word_dict = dict()
@@ -225,7 +224,7 @@ def build_word_dict():
 def load_embeddings(vocab):
     vocab_size = len(vocab)
     emb = np.random.uniform(-1, 1, (vocab_size, 300))
-    emb[Constant.PAD_ID] = 0  # <pad> should be all 0 (using broadcast)
+    emb['<pad>'] = 0  # <pad> should be all 0 (using broadcast)
 
     w2id = {w: i for i, w in enumerate(vocab)}
     with open('/disk1/sajad/glove/glove.6B.300d.txt', encoding="utf8") as f:
@@ -265,7 +264,7 @@ def load_test_data_nn(dir, label_dir, word_dict, max_document_len):
     if 'levela' in dir:
         label = np.where(label == "OFF", 1, 0)
     else:
-        label = np.where(label == "TIN", 1, 0)
+        label = np.where(label == "UIN", 1, 0)
 
     data = list(map(lambda d: tokenize_text(d), tweets))
     x = list(map(lambda d: ["<s>"] + d, data))
@@ -276,6 +275,11 @@ def load_test_data_nn(dir, label_dir, word_dict, max_document_len):
     y = list(map(lambda d: d, label))
 
     return x, y
+
+# def load_test_data_nn(dir, label_dir, word_dict, max_document_len):
+#
+# del load_bert(X, vocab):
+#     pass
 
 # with tf.variable_scope('bert_embedding'):
 #     bert_config = modelling.BertConfig.from_json_file(config['vocab_file'])

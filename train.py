@@ -21,7 +21,7 @@ def train(train_x, train_y1, train_y2, test_x1, test_x2, test_y1, test_y2, word_
 
         # Summary
         y1_loss_summary = tf.summary.scalar("y1_loss", model.subtaska_loss)
-        y2_loss_summary = tf.summary.scalar("clf_loss", model.subtaskb_loss)
+        y2_loss_summary = tf.summary.scalar("y2_loss", model.subtaskb_loss)
         Loss_summary = tf.summary.scalar("Loss", model.Loss)
         summary_op = tf.summary.merge_all()
         summary_writer = tf.summary.FileWriter("summary", sess.graph)
@@ -46,10 +46,10 @@ def train(train_x, train_y1, train_y2, test_x1, test_x2, test_y1, test_y2, word_
 
             for batch_x, batch_y, in test_batches:
                 if which == 'A':
-                    feed_dict = {model.X: batch_x, model.Y1: batch_y, model.Y2: batch_y, model.dropout: 0.8}
+                    feed_dict = {model.X: batch_x, model.Y1: batch_y, model.Y2: batch_y, model.dropout: args.dropout}
                     y_loss, accuracy = sess.run([model.subtaska_loss, model.suba_accuracy], feed_dict=feed_dict)
                 else:
-                    feed_dict = {model.X: batch_x, model.Y1: batch_y, model.Y2: batch_y, model.dropout: 0.8}
+                    feed_dict = {model.X: batch_x, model.Y1: batch_y, model.Y2: batch_y, model.dropout: args.dropout}
                     y_loss, accuracy = sess.run([model.subtaskb_loss, model.subb_accuracy], feed_dict=feed_dict)
                 losses += y_loss
                 accuracies += accuracy
@@ -61,7 +61,7 @@ def train(train_x, train_y1, train_y2, test_x1, test_x2, test_y1, test_y2, word_
         batches = batch_iter(train_x, train_y1, train_y2, args.batch_size, args.num_epochs)
         for batch_x, batch_y1, batch_y2 in batches:
             train_step(batch_x, batch_y1, batch_y2)
-        print("-------------Training Ended--------------")
+        print("\n-------------Training Ended--------------")
         print("Subtask A (Glove):")
         eval(test_x1, test_y1, 'A')
         print("Subtask B (Glove):")
@@ -72,13 +72,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--embedding_size", type=int, default=300, help="embedding size.")
     parser.add_argument("--num_layers", type=int, default=1, help="RNN network depth.")
-    parser.add_argument("--num_hidden", type=int, default=150, help="RNN network size.")
+    parser.add_argument("--num_hidden", type=int, default=200, help="RNN network size.")
 
-    parser.add_argument("--dropout", type=float, default=0.8, help="dropout keep prob.")
+    parser.add_argument("--dropout", type=float, default=0.7, help="dropout keep prob.")
     parser.add_argument("--learning_rate", type=float, default=1e-3, help="learning rate.")
-    parser.add_argument("--batch_size", type=int, default=64, help="batch size.")
-    parser.add_argument("--num_epochs", type=int, default=3, help="number of epochs.")
-    parser.add_argument("--max_document_len", type=int, default=100, help="max document length.")
+    parser.add_argument("--batch_size", type=int, default=100, help="batch size.")
+    parser.add_argument("--num_epochs", type=int, default=5, help="number of epochs.")
+    parser.add_argument("--max_document_len", type=int, default=120, help="max document length.")
     args = parser.parse_args()
 
     print("\nBuilding dictionary..")
