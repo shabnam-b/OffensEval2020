@@ -1,7 +1,7 @@
 import tensorflow as tf
 from tensorflow.contrib import rnn
 
-from utils.utils import load_embeddings
+from utils.utils import load_glove_embeddings, load_bert_embeddings
 
 
 class Model(object):
@@ -23,9 +23,10 @@ class Model(object):
             # self.embeddings = load_embeddings(vocab)
 
             # Bert Embeddings
+            # init_embeddings = load_bert_embeddings(self.X, vocab)
 
             # Glove Embeddings
-            init_embeddings = load_embeddings(vocab)
+            init_embeddings = load_glove_embeddings(vocab)
 
             # Random Embeddingss
             # init_embeddings = tf.random_uniform([vocabulary_size, self.embedding_size])

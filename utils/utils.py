@@ -221,7 +221,7 @@ def build_word_dict():
     return word_dict
 
 
-def load_embeddings(vocab):
+def load_glove_embeddings(vocab):
     vocab_size = len(vocab)
     emb = np.random.uniform(-1, 1, (vocab_size, 300))
     emb[0] = 0  # <pad> should be all 0 (using broadcast)
@@ -234,6 +234,12 @@ def load_embeddings(vocab):
             if token in w2id:
                 emb[w2id[token]] = [float(v) for v in elems[-300:]]
     return emb
+
+
+def load_bert_embeddings(input_ids, vocab):
+    iss=2
+    import pdb;pdb.set_trace()
+    pass
 
 
 def load_train_data_nn(word_dict, max_document_len):
