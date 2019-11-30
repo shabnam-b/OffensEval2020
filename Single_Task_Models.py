@@ -10,17 +10,20 @@ from keras.models import Sequential
 from keras.layers import Dense, Dropout, LSTM, Bidirectional 
 import numpy as np
 import pandas as pd
+from sklearn.metrics import classification_report
 
 # Read in the data
-olid_training = pd.read_csv('olid-training-v1.0.tsv', sep = '\t')
-olid_test_A = pd.read_csv('testset-levela.tsv', sep = '\t')
-olid_test_B = pd.read_csv('testset-levelb.tsv', sep = '\t')
-olid_labels_A = pd.read_csv('labels-levela.csv', header = None); olid_labels_A.columns = ['id', 'subtask_a']
-olid_labels_B = pd.read_csv('labels-levelb.csv', header = None); olid_labels_B.columns = ['id', 'subtask_b']
+olid_training = pd.read_csv('./dataset/olid-training-processed.tsv', sep = '\t')
+olid_test_A = pd.read_csv('./dataset/testset-levela-processed.tsv', sep = '\t')
+olid_test_B = pd.read_csv('./dataset/testset-levelb-processed.tsv', sep = '\t')
+olid_labels_A = pd.read_csv('./dataset/labels-levela.csv', header = None); olid_labels_A.columns = ['id', 'subtask_a']
+olid_labels_B = pd.read_csv('./dataset/labels-levelb.csv', header = None); olid_labels_B.columns = ['id', 'subtask_b']
 
 # Getting BERT ready
 from bert_serving.client import BertClient
 bc = BertClient()
+
+print('Start training...')
 
 # Get the data ready
 X_train = bc.encode(olid_training['tweet'].tolist())            # BERT encode
@@ -52,7 +55,12 @@ model_task_A.add(Dense(1, activation = 'sigmoid'))
 model_task_A.compile(loss = 'binary_crossentropy', optimizer = "adam", metrics = ['accuracy'])
 model_task_A.summary()
 
-model_task_A.fit(X_train, y_train_a, epochs = 5, batch_size = 10, validation_data = [X_valid, y_valid_a])
+model_task_A.fit(X_train, y_train_a, epochs = 5, batch_size = 10)#, validation_data = [X_valid, y_valid_a])
+
+y_pred_a = model_task_A.predict_classes(X_valid)
+print(classification_report(y_pred_a, y_valid_a))
+
+print('Task A finished.')
 
 """
 Approximate Accuracy after 5 epochs = 79%
@@ -91,10 +99,12 @@ model_task_B.add(Dense(1, activation = 'sigmoid'))
 model_task_B.compile(loss = 'binary_crossentropy', optimizer = "adam", metrics = ['accuracy'])
 model_task_B.summary()
 
-model_task_B.fit(X_train, y_train_b, epochs = 5, batch_size = 10, validation_data = [X_valid, y_valid_b])
+model_task_B.fit(X_train, y_train_b, epochs = 5, batch_size = 10)#, validation_data = [X_valid, y_valid_b])
 
+y_pred_b = model_task_B.predict_classes(X_valid)
+print(classification_report(y_pred_b, y_valid_b))
 """
 Approximate Accuracy after 5 epochs = 100%
 """
 
-
+print('Task B finished.')
