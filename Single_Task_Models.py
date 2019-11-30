@@ -66,13 +66,13 @@ X_train = bc.encode(task_B_data['tweet'].tolist())              # BERT encode
 X_train = X_train.reshape(4400, 1, 768)                         # Reshape for feeding to Bi-LSTM
 
 y_train_b = task_B_data['subtask_b']                            # Get Labels
-y_train_b = np.where(y_train_b == "OFF", 1, 0)                  # Transform to Binary Labels
+y_train_b = np.where(y_train_b == "UNT", 1, 0)                  # Transform to Binary Labels
 
 X_valid = bc.encode(olid_test_B['tweet'].tolist())
 X_valid = X_valid.reshape(240, 1, 768)
 
 y_valid_b = olid_labels_B['subtask_b']
-y_valid_b = np.where(y_valid_b == "OFF", 1, 0)
+y_valid_b = np.where(y_valid_b == "UNT", 1, 0)
 
 # Create the Model
 model_task_B = Sequential()
