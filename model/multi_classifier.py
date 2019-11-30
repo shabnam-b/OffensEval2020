@@ -4,58 +4,57 @@ from tensorflow.contrib import rnn
 from utils.utils import load_embeddings
 
 
-class MultiClassifier():
+class Model(object):
+    def __init__(self, vocabulary_size, num_class, args, vocab):
+        self.embedding_size = args.embedding_size
+        self.num_layers = args.num_layers
+        self.num_hidden = args.num_hidden
 
-    def __init__(self, num_labels, FLAGS):
-        # self.dropout = args.dropout
-        self.y_t1 = None
-        self.y_t2 = None
-        self.max_len = FLAGS.max_document_len
-        self.emb_size = FLAGS.embedding_size
-        self.num_layers = FLAGS.num_layers
-        self.num_hidden = FLAGS.num_hidden
-        self.num_labels = num_labels
+        self.X = tf.placeholder(tf.int32, [None, args.max_document_len])
+        self.Y1 = tf.placeholder(tf.int32, [None])
+        self.Y2 = tf.placeholder(tf.int32, [None])
+        self.dropout = tf.placeholder(tf.float64, [])
 
-        self.inp = tf.placeholder(tf.int32, [None, FLAGS.max_document_len])
-        self.y1 = tf.placeholder(tf.int32, [None, FLAGS.max_document_len])
-        self.y2 = tf.placeholder(tf.int32, [None])
+        self.X_len = tf.reduce_sum(tf.sign(self.X), 1)
 
-        self.dropout = tf.placeholder(tf.float32, [])
-        self.emb_size = FLAGS.embedding_size
-
-        self.x_len = tf.reduce_sum(tf.sign(self.inp), 1)
-
-        # Load the embeddings
         with tf.name_scope("embedding"):
-            embeddings = tf.get_variable("embeddings", initializer=load_embeddings())
-            self.vocab_size = embeddings.size(0)
-            self.x_emb = tf.nn.embedding_lookup(embeddings, self.input_ids)
+            # self.embeddings = load_embeddings(vocab)
+            init_embeddings = load_embeddings(vocab)
+            # init_embeddings = tf.random_uniform([vocabulary_size, self.embedding_size])
+            embeddings = tf.get_variable("embeddings", initializer=init_embeddings)
+            self.x_emb = tf.nn.embedding_lookup(embeddings, self.X)
 
-        with tf.name_scope("birnn"):
-            lstm_cell = rnn.MultiRNNCell([self.make_cell() for _ in range(self.num_layers)])
-            lstm_outputs, _ = tf.nn.dynamic_rnn(lstm_cell, self.x_emb, sequence_length=self.x_len, dtype=tf.float32)
+        with tf.name_scope("rnn"):
+            cell = rnn.MultiRNNCell([self.make_cell() for _ in range(self.num_layers)])
+            rnn_outputs, _ = tf.nn.dynamic_rnn(
+                cell, self.x_emb, sequence_length=self.X_len, dtype=tf.float64)
 
-        flattened = tf.reshape(lstm_outputs, [-1, self.max_len * self.num_hidden])
+        with tf.name_scope("subtaska-output"):
+            rnn_outputs_flat = tf.reshape(rnn_outputs, [-1, args.max_document_len * self.num_hidden])
+            self.subtaska_logits = tf.layers.dense(rnn_outputs_flat, num_class)
+            self.subtaska_predictions = tf.argmax(self.subtaska_logits, -1, output_type=tf.int32)
 
-        with tf.name_scope("task1-output"):
-            self.task1_logits = tf.layers.dense(flattened, self.vocab_size)
-            self.pred1 = tf.argmax(self.task1_logits, axis=-1)
-
-        with tf.name_scope("task2-output"):
-            self.task2_logits = tf.layers.dense(flattened, self.num_labels)
-            self.pred2 = tf.argmax(self.task2_logits, axis=-1)
+        with tf.name_scope("subtaskb-output"):
+            rnn_outputs_flat = tf.reshape(rnn_outputs, [-1, args.max_document_len * self.num_hidden])
+            self.subtaskb_logits = tf.layers.dense(rnn_outputs_flat, num_class)
+            self.subtaskb_predictions = tf.argmax(self.subtaskb_logits, -1, output_type=tf.int32)
 
         with tf.name_scope("loss"):
-            self.loss_t1 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(
-                logits=self.task1_logits,
-                labels=self.y_t1))
-            self.loss_t2 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(
-                logits=self.task2_logits,
-                labels=self.y_t2))
+            self.subtaska_loss = tf.reduce_mean(
+                tf.nn.sparse_softmax_cross_entropy_with_logits(logits=self.subtaska_logits, labels=self.Y1))
+            self.subtaskb_loss = tf.reduce_mean(
+                tf.nn.sparse_softmax_cross_entropy_with_logits(logits=self.subtaskb_logits, labels=self.Y2))
+            self.Loss = self.subtaska_loss + self.subtaskb_loss
 
-            self.Loss = self.loss_t1 + self.loss_t2
+        with tf.name_scope("subtaska-accuracy"):
+            correct_predictions = tf.equal(self.subtaska_predictions, self.Y1)
+            self.accuracy = tf.reduce_mean(tf.cast(correct_predictions, "float"))
+
+        # with tf.name_scope("subtaskb-accuracy"):
+        #     correct_predictions = tf.equal(self.subtaskb_predictions, self.Y2)
+        #     self.accuracy = tf.reduce_mean(tf.cast(correct_predictions, "float"))
 
     def make_cell(self):
-        lstm_cell = rnn.BasicLSTMCell(self.num_hidden)
-        lstm_cell_drp = rnn.DropoutWrapper(lstm_cell, output_keep_prob=self.dropout)
-        return lstm_cell_drp
+        cell = rnn.BasicLSTMCell(self.num_hidden)
+        cell = rnn.DropoutWrapper(cell, output_keep_prob=self.dropout)
+        return cell
