@@ -224,7 +224,7 @@ def build_word_dict():
 def load_embeddings(vocab):
     vocab_size = len(vocab)
     emb = np.random.uniform(-1, 1, (vocab_size, 300))
-    emb['<pad>'] = 0  # <pad> should be all 0 (using broadcast)
+    emb[0] = 0  # <pad> should be all 0 (using broadcast)
 
     w2id = {w: i for i, w in enumerate(vocab)}
     with open('/disk1/sajad/glove/glove.6B.300d.txt', encoding="utf8") as f:
@@ -275,14 +275,3 @@ def load_test_data_nn(dir, label_dir, word_dict, max_document_len):
     y = list(map(lambda d: d, label))
 
     return x, y
-
-# def load_test_data_nn(dir, label_dir, word_dict, max_document_len):
-#
-# del load_bert(X, vocab):
-#     pass
-
-# with tf.variable_scope('bert_embedding'):
-#     bert_config = modelling.BertConfig.from_json_file(config['vocab_file'])
-#     bert_encoder_layer = bert_transformer(input_ids, input_mask, bert_config, config)
-#
-# print("Done bert.")

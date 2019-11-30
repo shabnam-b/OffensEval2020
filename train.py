@@ -76,8 +76,8 @@ if __name__ == "__main__":
 
     parser.add_argument("--dropout", type=float, default=0.7, help="dropout keep prob.")
     parser.add_argument("--learning_rate", type=float, default=1e-3, help="learning rate.")
-    parser.add_argument("--batch_size", type=int, default=100, help="batch size.")
-    parser.add_argument("--num_epochs", type=int, default=5, help="number of epochs.")
+    parser.add_argument("--batch_size", type=int, default=150, help="batch size.")
+    parser.add_argument("--num_epochs", type=int, default=10, help="number of epochs.")
     parser.add_argument("--max_document_len", type=int, default=120, help="max document length.")
     args = parser.parse_args()
 
