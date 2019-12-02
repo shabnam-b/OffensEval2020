@@ -4,7 +4,7 @@ from tensorflow.contrib import rnn
 from utils.utils import load_glove_embeddings
 
 
-class Model(object):
+class BertClassificationModel(object):
     def __init__(self, vocabulary_size, num_class, args, vocab):
         self.embedding_size = args.embedding_size
         self.num_layers = args.num_layers
@@ -26,10 +26,10 @@ class Model(object):
             # init_embeddings = load_bert_embeddings(self.X, vocab)
 
             # Glove Embeddings
-            init_embeddings = load_glove_embeddings(vocab)
+            # init_embeddings = load_bert_embeddings(vocab)
 
             # Random Embeddingss
-            # init_embeddings = tf.random_uniform([vocabulary_size, self.embedding_size])
+            init_embeddings = tf.random_uniform([vocabulary_size, self.embedding_size])
             embeddings = tf.get_variable("embeddings", initializer=init_embeddings)
             self.x_emb = tf.nn.embedding_lookup(embeddings, self.X)
 
