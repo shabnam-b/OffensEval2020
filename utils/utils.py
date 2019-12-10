@@ -216,6 +216,7 @@ def build_word_dict():
     return word_dict
 
 
+
 def load_embeddings(vocab):
     vocab_size = len(vocab)
     emb = np.random.uniform(-1, 1, (vocab_size, 300))
