@@ -255,6 +255,7 @@ def load_train_data_nn(word_dict, max_document_len):
     return x, y1, y2
 
 
+
 def load_test_data_nn(dir, label_dir, word_dict, max_document_len):
     tweets, label = load_test_data(dir, label_dir)
 
