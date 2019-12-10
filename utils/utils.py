@@ -3,24 +3,15 @@ import os
 import pickle
 import re
 
-# import emoji
+import emoji
+from ekphrasis.classes.preprocessor import TextPreProcessor
+
 import nltk
 import numpy as np
 import pandas as pd
-# import spacy
 import tensorflow as tf
-# from bert_serving.client import BertClient
-from numpy import load
-
-from tqdm import tqdm
 
 import modelling
-from numpy import savez_compressed
-
-# bc = BertClient()
-
-
-# nlp = spacy.load("en_core_web_sm")
 
 
 def load_vec(path):
@@ -96,7 +87,7 @@ def bert_transformer(input_ids, input_mask, bert_config, config):
 
 
 def load_train_data(config):
-    df = pd.read_csv(config['data_dir'] + os.sep + "olid-training-v1.0.tsv", sep="\t", header=0)
+    df = pd.read_csv(config['data_dir'] + os.sep + "olid-training-processed.tsv", sep="\t", header=0)
     sents = df['tweet']
     label_a = df['subtask_a']
     label_b = df['subtask_b']
@@ -111,18 +102,14 @@ def load_test_sets_x(dataset_dir):
 
 
 def load_test_data(path_to_data, path_to_labels):
-    tweet_id = {}
     tweets = []
     with open(path_to_data) as input:
         next(input)
         for line in input:
             sp = line.split('\t')
-            tweet_id[sp[0]] = sp[1].strip('\n')
+            tweets.append(sp[1].strip('\n'))
     df = pd.read_csv(path_to_labels, header=None, names=['id', 'label'])
     lbs = df['label'].tolist()
-    ids = df['id'].tolist()
-    for i in ids:
-        tweets.append(tweet_id[str(i)])
     return tweets, lbs
 
 
@@ -131,33 +118,33 @@ def tokenize_text(text):
 
 
 def clean_tweets(tweets):
-    # text_processor = TextPreProcessor(
-    #     # terms that will be normalized
-    #     normalize=['email', 'phone',
-    #                'time', 'date', 'number'],
-    #     # terms that will be annotated
-    #     annotate={},
-    #     fix_html=False,  # fix HTML tokens
-    #
-    #     # corpus from which the word statistics are going to be used
-    #     # for word segmentation
-    #     segmenter="twitter",
-    #
-    #     # corpus from which the word statistics are going to be used
-    #     # for spell correction
-    #     corrector="twitter",
-    #
-    #     unpack_hashtags=True,  # perform word segmentation on hashtags
-    #     unpack_contractions=False,  # Unpack contractions (can't -> can not)
-    #     spell_correct_elong=False,  # spell correction for elongated words
-    #
-    # )
+    text_processor = TextPreProcessor(
+        # terms that will be normalized
+        normalize=['email', 'phone',
+                   'time', 'date', 'number'],
+        # terms that will be annotated
+        annotate={},
+        fix_html=False,  # fix HTML tokens
+
+        # corpus from which the word statistics are going to be used
+        # for word segmentation
+        segmenter="twitter",
+
+        # corpus from which the word statistics are going to be used
+        # for spell correction
+        corrector="twitter",
+
+        unpack_hashtags=True,  # perform word segmentation on hashtags
+        unpack_contractions=False,  # Unpack contractions (can't -> can not)
+        spell_correct_elong=False,  # spell correction for elongated words
+
+    )
     tweets = [re.sub(r"(#\w+)", "#\g<1>#", t) for t in tweets.tolist()]
-    # for i in range(len(tweets)):
-    # tweets[i] = re.sub(r"(#\w+)", "#\1#", tweets[i])
-    # tweets[i] = text_processor.pre_process_doc(tweets[i])
-    # tweets[i] = tweets[i]
-    # tweets[i] = emoji.demojize(tweets[i])
+    for i in range(len(tweets)):
+    tweets[i] = re.sub(r"(#\w+)", "#\1#", tweets[i])
+    tweets[i] = text_processor.pre_process_doc(tweets[i])
+    tweets[i] = tweets[i]
+    tweets[i] = emoji.demojize(tweets[i])
     return tweets
 
 
@@ -188,214 +175,20 @@ def batch_iter(inputs, y1, y2, batch_size, num_epochs):
             yield inputs[start_index:end_index], y1[start_index:end_index], y2[start_index:end_index]
 
 
-def batch_iter(inputs, y1, y2, batch_size, num_epochs):
+def batch_iter_eval(inputs, y, batch_size):
     inputs = np.array(inputs)
-    y1 = np.array(y1)
-    y2 = np.array(y2)
+    y = np.array(y)
     num_batches_per_epoch = (len(inputs) - 1) // batch_size + 1
 
-    for epoch in range(num_epochs):
-        print('Epoch {} started...'.format(epoch + 1))
-        for batch_num in range(num_batches_per_epoch):
-            start_index = batch_num * batch_size
-            end_index = min((batch_num + 1) * batch_size, len(inputs))
-            yield inputs[start_index:end_index], y1[start_index:end_index], y2[start_index:end_index]
+    for batch_num in range(num_batches_per_epoch):
+        start_index = batch_num * batch_size
+        end_index = min((batch_num + 1) * batch_size, len(inputs))
+        yield inputs[start_index:end_index], y[start_index:end_index]
 
 
-def batch_iter_eval(inputs, y, batch_size, num_epochs):
-    inputs = np.array(inputs)
-    y1 = np.array(y)
-    num_batches_per_epoch = (len(inputs) - 1) // batch_size + 1
-
-    for epoch in range(num_epochs):
-        for batch_num in range(num_batches_per_epoch):
-            start_index = batch_num * batch_size
-            end_index = min((batch_num + 1) * batch_size, len(inputs))
-            yield inputs[start_index:end_index], y1[start_index:end_index]
-
-
-def build_word_dict(args):
-    bert_embs = []
-    if not args.bert:
-        if not os.path.exists("word_dict.pickle"):
-            train_df = pd.read_csv('dataset/olid-training-v1.0.tsv', names=["tweet", "subtask_a", "subtask_b"])
-            tweets = clean_tweets(train_df["tweet"])
-
-            words = list()
-            for tweet in tweets:
-                for word in tokenize_text(tweet):
-                    words.append(word.lower())
-
-            word_counter = collections.Counter(words).most_common()
-            word_dict = dict()
-            word_dict["<pad>"] = 0
-            word_dict["<unk>"] = 1
-            word_dict["<s>"] = 2
-            word_dict["</s>"] = 3
-            for word, count in word_counter:
-                if count > 1:
-                    word_dict[word] = len(word_dict)
-
-            with open("word_dict.pickle", "wb") as f:
-                pickle.dump(word_dict, f)
-
-        else:
-            with open("word_dict.pickle", "rb") as f:
-                word_dict = pickle.load(f)
-    if args.bert:
-        if not os.path.exists("word_dict_bert.pickle"):
-            train_df = pd.read_csv('dataset/olid-training-v1.0.tsv', names=["tweet", "subtask_a", "subtask_b"],
-                                   nrows=10)
-            tweets = clean_tweets(train_df["tweet"][1:])
-            open("embeddings_bert.pickle", "wb")
-
-            word_dict = {}
-            b_embs = bc.encode([tokenize_text(tweet) for tweet in tweets], is_tokenized=True, show_tokens=True)
-            emb = np.random.uniform(-1, 1, (158, 768))
-            for i, tweet in enumerate(tweets):
-                tokenized = tokenize_text(tweet)
-                for j, word in enumerate(tokenized):
-                    word_dict[len(word_dict) + 1] = word
-
-                    if j + 1 < args.max_document_len and j + 1 < len(tokenized):
-                        emb[len(word_dict)] = b_embs[i][j]
-
-            with open("word_dict_bert.pickle", "wb") as f:
-                pickle.dump(word_dict, f)
-
-            with open("bert_embs.pickle", "wb") as f:
-                pickle.dump(emb, f)
-
-        else:
-            with open("word_dict_bert.pickle", "rb") as f:
-                word_dict = pickle.load(f)
-            with open("bert_embs.pickle", "rb") as f:
-                bert_embs = pickle.load(f)
-    return word_dict, bert_embs
-
-
-def load_glove_embeddings(vocab, glove_dir='/disk1/sajad/glove/glove.6B.300d.txt', emb_dim=300):
-    vocab_size = len(vocab)
-    emb = np.random.uniform(-1, 1, (vocab_size, emb_dim))
-    emb[0] = 0  # <pad> should be all 0 (using broadcast)
-
-    w2id = {w: i for i, w in enumerate(vocab)}
-    with open(glove_dir, encoding="utf8") as f:
-        for line in f:
-            elems = line.split()
-            token = ''.join(elems[0:-emb_dim])
-            if token in w2id:
-                emb[w2id[token]] = [float(v) for v in elems[-emb_dim:]]
-    return emb
-
-
-# def load_glove_embeddings(vocab):
-#     vocab_size = len(vocab)
-#     emb = np.random.uniform(-1, 1, (vocab_size, 300))
-#     emb[0] = 0  # <pad> should be all 0 (using broadcast)
-#
-#     w2id = {w: i for i, w in enumerate(vocab)}
-#     with open('/disk1/sajad/glove/glove.6B.300d.txt', encoding="utf8") as f:
-#         for line in f:
-#             elems = line.split()
-#             token = ''.join(elems[0:-300])
-#             if token in w2id:
-#                 emb[w2id[token]] = [float(v) for v in elems[-300:]]
-#     return emb
-
-
-def load_train_data_nn(word_dict, max_document_len):
-    df = pd.read_csv('dataset/olid-training-v1.0.tsv', sep='\t')
-    # Shuffle dataframe
-    # df = df.sample(frac=1)
-
-    data = list(map(lambda d: tokenize_text(d), df["tweet"][:100]))
-
-    id = 1
-    x = []
-    for di in data:
-        x_local = []
-        for i, token in enumerate(di):
-            if i < max_document_len:
-                x_local += [id]
-                id += 1
-            if i < max_document_len and i == len(di) - 1:
-                x_local += (max_document_len - len(di)) * [0]
-
-        x.append(x_local.copy())
-        x_local.clear()
-    import pdb;
-    pdb.set_trace()
-    x = list(map(lambda d: ["<s>"] + d, data))
-    x = list(map(lambda d: list(map(lambda w: word_dict.get(w, word_dict["<unk>"]), d)), x))
-    x = list(map(lambda d: d[:max_document_len], x))
-    x = list(map(lambda d: d + (max_document_len - len(d)) * [word_dict["<pad>"]], x))
-    suba = np.array(list(df['subtask_a']))
-    sub_a = np.where(suba == "OFF", 1, 0)
-    y1 = list(map(lambda d: d, sub_a))
-
-    subb = np.array(list(df['subtask_b']))
-    subb = np.where(subb == "TIN", 1, 0)
-    y2 = list(map(lambda d: d, subb))
-
-    return x, y1, y2
-
-
-def load_test_data_nn(dir, label_dir, word_dict, max_document_len):
-    tweets, label = load_test_data(dir, label_dir)
-
-    label = np.array(label)
-    if 'levela' in dir:
-        label = np.where(label == "OFF", 1, 0)
-    else:
-        label = np.where(label == "UIN", 1, 0)
-
-    data = list(map(lambda d: tokenize_text(d), tweets))
-    x = list(map(lambda d: ["<s>"] + d, data))
-    x = list(map(lambda d: list(map(lambda w: word_dict.get(w, word_dict["<unk>"]), d)), x))
-    x = list(map(lambda d: d[:max_document_len], x))
-    x = list(map(lambda d: d + (max_document_len - len(d)) * [word_dict["<pad>"]], x))
-
-    y = list(map(lambda d: d, label))
-
-    return x, y
-
-
-def load_train_data_nn_bert():
-    df = pd.read_csv('dataset/olid-training-v1.0.tsv', sep='\t')
-
-    x = list(map(lambda d: tokenize_text(d), df["tweet"]))
-
-    suba = np.array(list(df['subtask_a']))
-    sub_a = np.where(suba == "OFF", 1, 0)
-    y1 = list(map(lambda d: d, sub_a))
-
-    subb = np.array(list(df['subtask_b']))
-    subb = np.where(subb == "TIN", 1, 0)
-    y2 = list(map(lambda d: d, subb))
-
-    return x, y1, y2
-
-
-def load_test_data_nn_bert(dir, label_dir):
-    tweets, label = load_test_data(dir, label_dir)
-
-    label = np.array(label)
-    if 'levela' in dir:
-        label = np.where(label == "OFF", 1, 0)
-    else:
-        label = np.where(label == "UIN", 1, 0)
-
-    x = list(map(lambda d: tokenize_text(d), tweets))
-
-    y = list(map(lambda d: d, label))
-
-    return x, y
-
-
-def build_word_dict_lazy():
+def build_word_dict():
     if not os.path.exists("word_dict.pickle"):
-        train_df = pd.read_csv('dataset/olid-training-v1.0.tsv', names=["tweet", "subtask_a", "subtask_b"])
+        train_df = pd.read_csv('dataset/olid-training-processed.tsv', names=["tweet", "subtask_a", "subtask_b"])
         tweets = clean_tweets(train_df["tweet"])
 
         words = list()
@@ -419,37 +212,65 @@ def build_word_dict_lazy():
     else:
         with open("word_dict.pickle", "rb") as f:
             word_dict = pickle.load(f)
+
     return word_dict
 
 
-def get_glove_vocab(glove_dir, emb_dim):
-    g_tokens = []
-    with open(glove_dir, encoding="utf8") as f:
+def load_embeddings(vocab):
+    vocab_size = len(vocab)
+    emb = np.random.uniform(-1, 1, (vocab_size, 300))
+    emb[0] = 0  # <pad> should be all 0 (using broadcast)
+
+    w2id = {w: i for i, w in enumerate(vocab)}
+    with open('/disk1/sajad/glove/glove.6B.300d.txt', encoding="utf8") as f:
         for line in f:
             elems = line.split()
-            token = ''.join(elems[0:-emb_dim])
-            g_tokens.append(token)
-    return g_tokens
-
-
-def glove_embeddings_whole_training(db, glove_dir='/disk1/sajad/glove/glove.6B.300d.txt', max_seq_len=120, emb_dim=300):
-
-    if not os.path.exists('glove_embs.npy'):
-        emb = np.random.uniform(-1, 1, (len(db), max_seq_len, emb_dim))
-        vocab = build_word_dict_lazy()
-        emb_cached = load_glove_embeddings(vocab, glove_dir, emb_dim)
-        for i, tweet in enumerate(db):
-            tokenized = tokenize_text(tweet)
-            for j, token in enumerate(tokenized):
-                if token.lower() in vocab and j < len(tokenized) and j < max_seq_len:
-                    emb[i][j] = emb_cached[vocab.get(token.lower())]
-                if j == len(tokenized) - 1 and j < max_seq_len:  # Should pad the other dimensions by [0]
-                    for k in range(j + 1, max_seq_len):
-                        emb[i][k] = np.zeros(emb_dim)
-                elif j >= max_seq_len:
-                    break
-        savez_compressed('glove_embs.npy', emb)
-    else:
-        emb = load('glove_embs.npy')
-
+            token = ''.join(elems[0:-300])
+            if token in w2id:
+                emb[w2id[token]] = [float(v) for v in elems[-300:]]
     return emb
+
+
+def load_train_data_nn(word_dict, max_document_len):
+    df = pd.read_csv('dataset/olid-training-processed.tsv', sep='\t')
+    # Shuffle dataframe
+    # df = df.sample(frac=1)
+
+    data = list(map(lambda d: tokenize_text(d), df["tweet"]))
+    x = list(map(lambda d: ["<s>"] + d, data))
+    x = list(map(lambda d: list(map(lambda w: word_dict.get(w, word_dict["<unk>"]), d)), x))
+    x = list(map(lambda d: d[:max_document_len], x))
+    x = list(map(lambda d: d + (max_document_len - len(d)) * [word_dict["<pad>"]], x))
+    suba = np.array(list(df['subtask_a']))
+    sub_a = np.where(suba == "OFF", 1, 0)
+    y1 = list(map(lambda d: d, sub_a))
+
+
+    subb = np.array(list(df['subtask_b']))
+    # subb = np.where(subb == "TIN", 1, 0)
+    subb = np.where(subb == "UNT", 1,
+                     (np.where(subb == "TIN", 0, 2)))
+    y2 = list(map(lambda d: d, subb))
+
+    return x, y1, y2
+
+
+def load_test_data_nn(dir, label_dir, word_dict, max_document_len):
+    tweets, label = load_test_data(dir, label_dir)
+
+    label = np.array(label)
+    if 'levela' in dir:
+        label = np.where(label == "OFF", 1, 0)
+    else:
+        # label = np.where(label == "UNT", 1, 0)
+        label = np.where(label == "UNT", 1,
+                 (np.where(label == "TIN", 0, 2)))
+
+    data = list(map(lambda d: tokenize_text(d), tweets))
+    x = list(map(lambda d: ["<s>"] + d, data))
+    x = list(map(lambda d: list(map(lambda w: word_dict.get(w, word_dict["<unk>"]), d)), x))
+    x = list(map(lambda d: d[:max_document_len], x))
+    x = list(map(lambda d: d + (max_document_len - len(d)) * [word_dict["<pad>"]], x))
+
+    y = list(map(lambda d: d, label))
+    return x, y

@@ -1,15 +1,15 @@
+import numpy as np
 import tensorflow as tf
 from tensorflow.contrib import rnn
 
-from utils.utils import load_glove_embeddings
+from utils.utils import load_embeddings
 
 
 class Model(object):
-    def __init__(self, vocabulary_size, num_class, args, vocab):
+    def __init__(self, num_class, args, vocab):
         self.embedding_size = args.embedding_size
         self.num_layers = args.num_layers
         self.num_hidden = args.num_hidden
-        self.num_hidden = self.num_hidden * 2
 
         self.X = tf.placeholder(tf.int32, [None, args.max_document_len])
         self.Y1 = tf.placeholder(tf.int32, [None])
@@ -19,15 +19,7 @@ class Model(object):
         self.X_len = tf.reduce_sum(tf.sign(self.X), 1)
 
         with tf.name_scope("embedding"):
-            # Embeddings whether GloVe or Bert
-            # self.embeddings = load_embeddings(vocab)
-
-            # Bert Embeddings
-            # init_embeddings = load_bert_embeddings(self.X, vocab)
-
-            # Glove Embeddings
-            init_embeddings = load_glove_embeddings(vocab)
-
+            init_embeddings = load_embeddings(vocab)
             # Random Embeddingss
             # init_embeddings = tf.random_uniform([vocabulary_size, self.embedding_size])
             embeddings = tf.get_variable("embeddings", initializer=init_embeddings)
@@ -53,8 +45,11 @@ class Model(object):
         with tf.name_scope("loss"):
             self.subtaska_loss = tf.reduce_mean(
                 tf.nn.sparse_softmax_cross_entropy_with_logits(logits=self.subtaska_logits, labels=self.Y1))
-            self.subtaskb_loss = tf.reduce_mean(
-                tf.nn.sparse_softmax_cross_entropy_with_logits(logits=self.subtaskb_logits, labels=self.Y2))
+
+            valid_idxs = tf.where(self.Y2 < 2)[:, 0]
+            valid_logits = tf.gather(self.subtaskb_logits, valid_idxs)
+            valid_labels = tf.gather(self.Y2, valid_idxs)
+            self.subtaskb_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=valid_labels, logits=valid_logits))
             self.Loss = self.subtaska_loss + self.subtaskb_loss
 
         with tf.name_scope("subtaska-accuracy"):
@@ -64,6 +59,25 @@ class Model(object):
         with tf.name_scope("subtaskb-accuracy"):
             correct_predictions = tf.equal(self.subtaskb_predictions, self.Y2)
             self.subb_accuracy = tf.reduce_mean(tf.cast(correct_predictions, "float"))
+
+        with tf.name_scope("subtaska-f1"):
+            TP1 = tf.count_nonzero(self.subtaska_predictions * self.Y1)
+            TN1 = tf.count_nonzero((self.subtaska_predictions - 1) * (self.Y1 - 1))
+            FP1 = tf.count_nonzero(self.subtaska_predictions * (self.Y1 - 1))
+            FN1 = tf.count_nonzero((self.subtaska_predictions - 1) * self.Y1)
+            precision1 = TP1 / (TP1 + FP1)
+            recall1 = TP1 / (TP1 + FN1)
+
+            self.f1_suba = 2 * precision1 * recall1 / (precision1 + recall1)
+
+        with tf.name_scope("subtaskb-f1"):
+            TP = tf.count_nonzero(self.subtaskb_predictions * self.Y2)
+            TN = tf.count_nonzero((self.subtaskb_predictions - 1) * (self.Y2 - 1))
+            FP = tf.count_nonzero(self.subtaskb_predictions * (self.Y2 - 1))
+            FN = tf.count_nonzero((self.subtaskb_predictions - 1) * self.Y2)
+            self.precision = TP / (TP + FP)
+            self.recall = TP / (TP + FN)
+            self.f1_subb = 2 * self.precision * self.recall / (self.precision + self.recall)
 
     def make_cell(self):
         cell = rnn.BasicLSTMCell(self.num_hidden / 2)
